@@ -3,12 +3,24 @@
 #include <ctype.h>
 #include <string.h>
 
+void bigToLittleEndian(char * dest, char * original){
+    int i = strlen(original)-1;
+    int k = 0;
+    while(k < strlen(original)){
+        dest[k] = original[i-1];
+        dest[k+1] = original[i];
+        k = k+2;
+        i = i-2;
+    }
+}
+
 void doNoOp(char input){
     if(input = '0'){
+        //IP = IP + 1;
         printf("nop\n");
     }
     else
-        printf("ERROR <wonky>\n");
+        printf("ERROR <wonky1>\n");
 }
 
 void doHalt(char input){
@@ -16,7 +28,7 @@ void doHalt(char input){
         printf("halt\n");
     }
     else
-        printf("ERROR <wonky>");
+        printf("ERROR <wonky2>");
 }
 
 void dorrmovl(char input, char * bitval){
@@ -24,33 +36,46 @@ void dorrmovl(char input, char * bitval){
         printf("rrmovl r%c,r%c\n",bitval[0],bitval[1]);
     }
     else
-        printf("ERROR <wonky>\n");
+        printf("ERROR <wonky3>\n");
 }
 
 void doirmovl(char input,char * bitval){
+    char * tmp = malloc(strlen(bitval) - 1);
+    bigToLittleEndian(tmp,bitval+2);
+    tmp[strlen(bitval)-2] = '\0';
 
     if(input == '0' && bitval[0] == 'f'){
-        printf("irmovl 0x%s,r%c\n",bitval+2,bitval[1]);
+        printf("irmovl 0x%s,r%c\n",tmp,bitval[1]);
+        free(tmp);
     }
     else
-        printf("ERROR <wonky>\n");
+        printf("ERROR <wonky4>\n");
 
 }
 
 void dormmovl(char input,char * bitval){
+    char * tmp = malloc(strlen(bitval) - 1);
+    bigToLittleEndian(tmp,bitval+2);
+    tmp[strlen(bitval)-2] = '\0';
+   
     if(input == '0'){
-        printf("rmmovl r%c,0x%s(r%c)\n",bitval[0],bitval+2,bitval[1]);
+        printf("rmmovl r%c,0x%s(r%c)\n",bitval[0],tmp,bitval[1]);
+        free(tmp);
     }
     else
-        printf("ERROR <wonky>\n");
+        printf("ERROR <wonky5>\n");
 }
 
 void domrmovl(char input,char * bitval){
+    char * tmp = malloc(strlen(bitval) - 1);
+    bigToLittleEndian(tmp,bitval+2);
+    tmp[strlen(bitval)-2] = '\0';
+
     if(input == '0'){
-        printf("mrmovl 0x%s(r%c),r%c\n",bitval+2, bitval[0],bitval[1]);
+        printf("mrmovl 0x%s(r%c),r%c\n",tmp, bitval[0],bitval[1]);
     }
     else
-        printf("ERROR <wonky>\n");
+        printf("ERROR <wonky6>\n");
 }
 
 void doOper(char input, char * bitval){
@@ -74,58 +99,78 @@ void doOper(char input, char * bitval){
             printf("cmpl r%c,r%c\n", bitval[0], bitval[1]);
             break;  
         default:  
-            printf("ERROR <wonky>\n"); 
+            printf("ERROR <wonky7>\n"); 
             break;
     }
 }
 
 
 void doJmp(char input, char * bitval){
-    char dest [8];
+    
+    char * dest = malloc(9);
     strncpy(dest, bitval,8);
+    dest[8] = '\0';
+
+    char * tmp = malloc(strlen(dest) + 1);
+    bigToLittleEndian(tmp,dest);
+    tmp[strlen(dest)] = '\0';
+    free(dest);
     switch(input){
         case '0':
-            printf("jmp 0x%s\n", dest);
+            printf("jmp 0x%s\n", tmp);
+            free(tmp);
             break;
         case '1':
-            printf("jle 0x%s\n", dest);
+            printf("jle 0x%s\n", tmp);
+            free(tmp);
             break;
         case '2':
-            printf("jl 0x%s\n", dest);
+            printf("jl 0x%s\n", tmp);
+            free(tmp);
             break;
         case '3':
-            printf("je 0x%s\n", dest);
+            printf("je 0x%s\n", tmp);
+            free(tmp);
             break;
         case '4':
-            printf("jne 0x%s\n", dest);
+            printf("jne 0x%s\n", tmp);
+            free(tmp);
             break;
         case '5':
-            printf("jge 0x%s\n", dest);
+            printf("jge 0x%s\n", tmp);
+            free(tmp);
             break;
         case '6':
-            printf("jg 0x%s\n", dest);
+            printf("jg 0x%s\n", tmp);
+            free(tmp);
             break;
         default:
-            printf("ERROR <wonky>\n"); 
+            printf("ERROR <wonky8>\n"); 
             break;
     }
 }
 
 void doCall(char input, char * bitval){
-    char dest[8];
-    strncpy(dest,bitval,8);
+    char * dest = malloc(9);
+    strncpy(dest, bitval,8);
+    dest[8] = '\0';
+
+    char * tmp = malloc(strlen(dest) + 1);
+    bigToLittleEndian(tmp,dest);
+    tmp[strlen(dest)] = '\0';
+
     if(input == '0'){
-        printf("call 0x%s\n", dest);
+        printf("call 0x%s\n", tmp);
     }
     else
-        printf("ERROR <wonky>\n"); 
+        printf("ERROR <wonky9>\n"); 
 }
 
 void doRet(char input){
     if(input == '0')
         printf("ret\n");
     else
-        printf("ERROR <wonky>\n"); 
+        printf("ERROR <wonky10>\n"); 
 }
 
 void doPushl(char input, char * bitval){
@@ -133,7 +178,7 @@ void doPushl(char input, char * bitval){
         printf("pushl r%c\n",bitval[0]);
     }
     else
-        printf("ERROR <wonky>\n");
+        printf("ERROR <wonky11>\n");
 }
 
 void doPopl(char input, char * bitval){
@@ -141,39 +186,57 @@ void doPopl(char input, char * bitval){
         printf("popl r%c\n",bitval[0]);
     }
     else
-        printf("ERROR <wonky>\n");
+        printf("ERROR <wonky12>\n");
 }
 
 void doReadX(char input, char * bitval){
+    char * tmp = malloc(strlen(bitval) - 1);
+    bigToLittleEndian(tmp,bitval+2);
+    tmp[strlen(bitval)-2] = '\0';
+
     if(input == '0' && bitval[1] == 'f'){
-        printf("readb 0x%s(r%c)\n",bitval+2,bitval[0]);
+        printf("readb 0x%s(r%c)\n",tmp,bitval[0]);
+        free(tmp);
     }
     else if(input == '1' && bitval[1] == 'f'){
-        printf("readl 0x%s(r%c)\n",bitval+2,bitval[0]);
+        printf("readl 0x%s(r%c)\n",tmp,bitval[0]);
+        free(tmp);
     }
      else
-        printf("ERROR <wonky>\n");
+        printf("ERROR <wonky13>\n");
 }
 
 void doWriteX(char input, char * bitval){
+    char * tmp = malloc(strlen(bitval) - 1);
+    bigToLittleEndian(tmp,bitval+2);
+    tmp[strlen(bitval)-2] = '\0';
+
+    
     if(input == '0' && bitval[1] == 'f'){
-        printf("writeb 0x%s(r%c)\n",bitval+2,bitval[0]);
+        printf("writeb 0x%s(r%c)\n",tmp,bitval[0]);
+        free(tmp);
     }
     else if(input == '1' && bitval[1] == 'f'){
-        printf("writel 0x%s(r%c)\n",bitval+2,bitval[0]);
+        printf("writel 0x%s(r%c)\n",tmp,bitval[0]);
+        free(tmp);
     }
     else
-        printf("ERROR <wonky>\n");
+        printf("ERROR <wonky14>\n");
 }
 
 void doMovsbl(char input, char * bitval){
+    char * tmp = malloc(strlen(bitval) - 1);
+    bigToLittleEndian(tmp,bitval+2);
+    tmp[strlen(bitval)-2] = '\0';
+
+
     if(input == '0'){
-        printf("movsbl 0x%s(r%c),r%c\n",bitval+2,bitval[1], bitval[0]);
+        printf("movsbl 0x%s(r%c),r%c\n",tmp,bitval[1], bitval[0]);
+        free(tmp);
     }
     else
-        printf("ERROR <wonky>\n");
+        printf("ERROR <wonky15>\n");
 }
-
 int main(int argc, char ** argv){
     if(argv[1][0] == '-' && argv[1][1] == 'h'){
         printf("y86dis [-h] <y86 input file> \nInput is a *.y86 file\n");
