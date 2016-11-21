@@ -5,9 +5,12 @@
 
 unsigned char * memory;
 int IP;
-int OF = 0;
-int ZF = 0;
-int SF = 0;
+
+struct {
+    unsigned int OF : 1;
+    unsigned int ZF : 1;
+    unsigned int SF : 1;
+} flags;
 
 typedef union{
     struct {
@@ -57,6 +60,7 @@ void seperateToToge(char * dest, char * input){
 }
 
 void getStrFromReg(char * dest, int i){
+    
     int x = 0;
     char * tmpa = malloc(3);
     int count = 0;
@@ -149,63 +153,6 @@ void movSBL(int a, int b, char * val){
     free(tmp);
     free(rev);
     free(orig);
-}
-
-void doCmpl(int a, int b){
-    char * rev = malloc(10);
-    getStrFromReg(rev, a);
-    char * val1str = malloc(10);
-    bigToLittleEndian(val1str,rev);
-    int val1 = hexToDecimal(val1str);
-    char * val2str = malloc(10);
-    getStrFromReg(rev, b);
-    bigToLittleEndian(val2str,rev);
-    int val2 = hexToDecimal(val2str);
-    int tmpres = val1 - val2;
-
-    //fprintf(stdout, "\n %d - %d = %d \n", val1, val2, tmpres);
-    /*
-    if(val1 < 0 && val2 > 0 && tmpres > 0){
-        OF = 1;
-    }
-    else if(val1 > 0 && val2 < 0 && tmpres < 0){
-        OF = 1;
-    }
-    else{
-        OF = 0;
-    }
-*/
-    OF = 0;
-    if(tmpres == 0){
-        ZF = 1;
-    }
-    else{
-        ZF = 0;
-    }
-
-    if(tmpres < 0){
-        SF = 1;
-    }
-    else{
-        SF = 0;
-    }
-
-    free(val2str);
-    free(val1str);
-    free(rev);
-}
-
-void doJump(char * dest){
-    fprintf(stdout, "\njmpcompleted\n");
-    IP = hexToDecimal(dest);
-}
-
-void doJe(char * dest){
-    if(ZF == 1){
-        IP = hexToDecimal(dest);
-    }
-    else
-        IP = IP + 5;
 }
 
 void doNoOp(char input){
@@ -302,23 +249,23 @@ void doAdd(int a, int b){
     int tmpres = val1 + val2;
     //printf("%d + %d = %d\n", val1, val2, tmpres);
     if(val1 > 0 && val2 > 0 && tmpres < 0){
-        OF = 1;
+        flags.OF = 1;
     }
-    else if(val1 < 0 && val2 < 0 && tmpres < 0){
-        OF = 1;
+    else if(val1 < 0 && val2 < 0 && tmpres > 0){
+        flags.OF = 1;
     }
     else
-        OF = 0;
+        flags.OF = 0;
 
     if(tmpres < 0)
-        SF = 1;
+        flags.SF = 1;
     else
-        SF = 0;
+        flags.SF = 0;
 
     if(tmpres == 0)
-        ZF = 1;
+        flags.ZF = 1;
     else
-        ZF = 0;
+        flags.ZF = 0;
 
     char * tmp = malloc(9);
 
@@ -333,6 +280,204 @@ void doAdd(int a, int b){
 
 }
 
+void doSubl(int a, int b){
+    char * rev = malloc(10);
+    getStrFromReg(rev, a);
+    printf("%s\n",rev);
+    
+    char * val1str = malloc(10);
+    bigToLittleEndian(val1str,rev);
+    
+    int val1 = hexToDecimal(val1str);
+    char * val2str = malloc(10);
+    
+    getStrFromReg(rev, b);
+    printf("%s\n",rev);
+    bigToLittleEndian(val2str,rev);
+    
+    int val2 = hexToDecimal(val2str);
+    int tmpres = val1 - val2;
+    //printf("%d + %d = %d\n", val1, val2, tmpres); 
+    
+    if(val1 < 0 && val2 > 0 && tmpres > 0){
+        flags.OF = 1;
+    }
+    else if(val1 > 0 && val2 < 0 && tmpres < 0){
+        flags.OF = 1;
+    }
+    else{
+        flags.OF = 0;
+    }
+    if(tmpres < 0)
+        flags.SF = 1;
+    else
+        flags.SF = 0;
+
+    if(tmpres == 0)
+        flags.ZF = 1;
+    else
+        flags.ZF = 0;
+
+    char * tmp = malloc(9);
+
+    sprintf(tmp,"%08x",tmpres);
+    
+    bigToLittleEndian(rev,tmp);
+    storeInReg(b,rev);
+
+    free(val2str);
+    free(val1str);
+    free(rev);
+}
+
+void doAndl(int a, int b){
+
+    int i = 0;
+    for(i = 0; i < 4; i++){
+        registers[b][i].byte = registers[a][i].byte & registers[b][i].byte;
+    }
+    
+    char * res = malloc(10);
+    getStrFromReg(res, b);
+     
+    char * val1str = malloc(10);
+    bigToLittleEndian(val1str,res);
+    
+    int val1 = hexToDecimal(val1str);
+
+    flags.OF = 0;
+    if(val1 < 0)
+        flags.SF = 1;
+    else
+        flags.SF = 0;
+    
+    if(val1 == 0)
+        flags.ZF = 1;
+    else
+        flags.ZF = 0; 
+    //printf("%s\n",res);
+    free(val1str);
+    free(res);
+
+}
+
+void doXorl(int a, int b){
+
+    int i = 0;
+    for(i = 0; i < 4; i++){
+        registers[b][i].byte = registers[a][i].byte ^ registers[b][i].byte;
+    }
+    
+    char * res = malloc(10);
+    getStrFromReg(res, b);
+     
+    char * val1str = malloc(10);
+    bigToLittleEndian(val1str,res);
+    
+    int val1 = hexToDecimal(val1str);
+
+    flags.OF = 0;
+    if(val1 < 0)
+        flags.SF = 1;
+    else
+        flags.SF = 0;
+    
+    if(val1 == 0)
+        flags.ZF = 1;
+    else
+        flags.ZF = 0; 
+    //printf("%s\n",res);
+    free(val1str);
+    free(res);
+
+}
+
+void doMull(int a, int b){
+    char * rev = malloc(10);
+    getStrFromReg(rev, a);
+    printf("%s\n",rev);
+    
+    char * val1str = malloc(10);
+    bigToLittleEndian(val1str,rev);
+    
+    int val1 = hexToDecimal(val1str);
+    char * val2str = malloc(10);
+    
+    getStrFromReg(rev, b);
+    printf("%s\n",rev);
+    bigToLittleEndian(val2str,rev);
+    
+    int val2 = hexToDecimal(val2str);
+    int tmpres = val1 * val2;
+    //printf("%d + %d = %d\n", val1, val2, tmpres);
+    if(val1 > 0 && val2 > 0 && tmpres < 0){
+        flags.OF = 1;
+    }
+    else if(val1 < 0 && val2 < 0 && tmpres < 0){
+        flags.OF = 1;
+    }
+    else if(((val1 < 0 && val2 > 0)||(val1 > 0 && val2 < 0)) && tmpres > 0){
+        flags.OF = 1;
+    }
+    else
+        flags.OF = 0;
+
+    if(tmpres < 0)
+        flags.SF = 1;
+    else
+        flags.SF = 0;
+
+    if(tmpres == 0)
+        flags.ZF = 1;
+    else
+        flags.ZF = 0;
+
+    char * tmp = malloc(9);
+
+    sprintf(tmp,"%08x",tmpres);
+    
+    bigToLittleEndian(rev,tmp);
+    storeInReg(b,rev);
+
+    free(val2str);
+    free(val1str);
+    free(rev);
+
+}
+
+void doCmpl(int a, int b){
+    char * rev = malloc(10);
+    getStrFromReg(rev, a);
+    char * val1str = malloc(10);
+    bigToLittleEndian(val1str,rev);
+    int val1 = hexToDecimal(val1str);
+    char * val2str = malloc(10);
+    getStrFromReg(rev, b);
+    bigToLittleEndian(val2str,rev);
+    int val2 = hexToDecimal(val2str);
+    int tmpres = val1 - val2;
+
+    flags.OF = 0;
+    if(tmpres == 0){
+        flags.ZF = 1;
+    }
+    else{
+        flags.ZF = 0;
+    }
+
+    if(tmpres < 0){
+        flags.SF = 1;
+    }
+    else{
+        flags.SF = 0;
+    }
+
+    free(val2str);
+    free(val1str);
+    free(rev);
+}
+
+
 void doOper(char input, char * bitval){
     int a = bitval[0] - '0';
     int b = bitval[1] - '0';
@@ -344,15 +489,19 @@ void doOper(char input, char * bitval){
             break;
         case '1':
             fprintf(stdout,"subl r%c,r%c\n", bitval[0], bitval[1]);
+            doSubl(a,b);
             break;
         case '2':
             fprintf(stdout,"andl r%c,r%c\n", bitval[0], bitval[1]);
+            doAndl(a,b);
             break;
         case '3':
             fprintf(stdout,"xorl r%c,r%c\n", bitval[0], bitval[1]);
+            doXorl(a,b);
             break;
         case '4':
             fprintf(stdout,"mull r%c,r%c\n", bitval[0], bitval[1]);
+            doMull(a,b);
             break;
         case '5':
             fprintf(stdout,"cmpl r%c,r%c\n", bitval[0], bitval[1]);
@@ -364,6 +513,58 @@ void doOper(char input, char * bitval){
     }
 }
 
+void doJump(char * dest){
+    fprintf(stdout, "\njmpcompleted\n");
+    IP = hexToDecimal(dest);
+}
+
+void doJle(char * dest){
+    if((flags.SF ^ flags.OF) || flags.ZF){
+        IP = hexToDecimal(dest);
+    }
+    else
+        IP = IP + 5;
+}
+
+void doJl(char * dest){
+    if(flags.SF ^ flags.OF){
+        IP = hexToDecimal(dest);
+    }
+    else
+        IP = IP + 5;
+}
+
+void doJe(char * dest){
+    if(flags.ZF == 1){
+        IP = hexToDecimal(dest);
+    }
+    else
+        IP = IP + 5;
+}
+
+void doJne(char * dest){
+    if(!flags.ZF == 1){
+        IP = hexToDecimal(dest);
+    }
+    else
+        IP = IP + 5;
+}
+
+void doJGe(char * dest){
+    if(!(flags.SF ^ flags.OF)){
+        IP = hexToDecimal(dest);
+    }
+    else
+        IP = IP + 5;
+}
+
+void doJg(char * dest){
+    if(!(flags.SF^flags.OF) && !flags.ZF){
+        IP = hexToDecimal(dest);
+    }
+    else
+        IP = IP + 5;
+}
 
 void doJmp(char input, char * bitval){
     
@@ -419,6 +620,37 @@ void doJmp(char input, char * bitval){
     free(dest);
 }
 
+void call(char * val){
+    char * rev = malloc(10);
+    char * toge = malloc(10);
+      
+    getStrFromReg(rev, 4);
+    char * val2str = malloc(10);
+    bigToLittleEndian(val2str,rev);
+    int espa = hexToDecimal(val2str);
+    espa = espa - 4;
+ 
+    char * tmp = malloc(10);
+    sprintf(tmp,"%08x",IP+5);
+    bigToLittleEndian(rev,tmp);
+
+    seperateToToge(toge,rev);
+
+    int i = 0;
+    for(i = 0; i < 4; i++){
+        memory[espa + i] = toge[i];
+    }
+    
+    //bigToLittleEndian(val2str,val);
+    IP = hexToDecimal(val);
+
+    sprintf(tmp,"%08x",espa);
+    
+    bigToLittleEndian(rev,tmp);
+    storeInReg(4,rev);
+ 
+}
+
 void doCall(char input, char * bitval){
     char * dest = malloc(9);
     strncpy(dest, bitval,8);
@@ -429,45 +661,173 @@ void doCall(char input, char * bitval){
     tmp[strlen(dest)] = '\0';
 
     if(input == '0'){
+        call(tmp);
         fprintf(stdout,"call 0x%s\n", tmp);
     }
     else
         fprintf(stderr,"ERROR <wonky9>\n"); 
 }
 
+void ret(){
+    
+    char * rev = malloc(10);
+    
+    getStrFromReg(rev, 4);
+    char * val2str = malloc(10);
+    bigToLittleEndian(val2str,rev);
+    int espa = hexToDecimal(val2str);
+    
+    char * returnval = malloc(5);
+
+    int i = 0;
+    for(i = 0; i < 4; i++){
+         returnval[i] = memory[espa + i];
+    }
+
+    returnval[4] = '\0';
+
+    int x = 0;
+    char * tmpa = malloc(3);
+    char * dest = malloc(10);
+    int count = 0;
+    for(x = 0; x < 4; x++){
+        sprintf(tmpa, "%02x", returnval[x]);
+        dest[count] = tmpa[0];
+        dest[count+1] = tmpa[1];
+        count = count+2;
+    }
+    dest[8] = '\0';
+
+    bigToLittleEndian(val2str,dest);
+    IP = hexToDecimal(val2str);
+
+    espa = espa + 4;
+
+    char * tmp = malloc(10);
+    sprintf(tmp,"%08x",espa);
+    
+    bigToLittleEndian(rev,tmp);
+    storeInReg(4,rev);
+    
+ 
+}
+
 void doRet(char input){
-    if(input == '0')
+    if(input == '0'){
+        ret();
         fprintf(stdout,"ret\n");
+    }
     else
         fprintf(stderr,"ERROR <wonky10>\n"); 
 }
 
+void pushl(int a){
+    char * rev = malloc(10);
+    
+    getStrFromReg(rev, 4);
+    char * val2str = malloc(10);
+    bigToLittleEndian(val2str,rev);
+    int espa = hexToDecimal(val2str);
+    espa = espa - 4;
+   
+    int i = 0;
+    for(i = 0; i < 4; i++){
+        memory[espa + i] = registers[a][i].byte;
+    }
+
+    char * tmp = malloc(10);
+    sprintf(tmp,"%08x",espa);
+    
+    bigToLittleEndian(rev,tmp);
+    storeInReg(4,rev);
+ 
+}
+
 void doPushl(char input, char * bitval){
+    int a = bitval[0] - '0';
     if(input == '0'&& bitval[1] == 'f'){
+        pushl(a);
         fprintf(stdout,"pushl r%c\n",bitval[0]);
     }
     else
         fprintf(stderr,"ERROR <wonky11>\n");
 }
 
+void popl(int a){
+    char * rev = malloc(10);
+    
+    getStrFromReg(rev, 4);
+    char * val2str = malloc(10);
+    bigToLittleEndian(val2str,rev);
+    int espa = hexToDecimal(val2str);
+   
+    int i = 0;
+    for(i = 0; i < 4; i++){
+         registers[a][i].byte = memory[espa + i];
+    }
+
+    espa = espa + 4;
+
+    char * tmp = malloc(10);
+    sprintf(tmp,"%08x",espa);
+    
+    bigToLittleEndian(rev,tmp);
+    storeInReg(4,rev);
+
+}
+
 void doPopl(char input, char * bitval){
+    int a = bitval[0] - '0';
     if(input == '0'&& bitval[1] == 'f'){
+        popl(a);
         fprintf(stdout,"popl r%c\n",bitval[0]);
     }
     else
         fprintf(stderr,"ERROR <wonky12>\n");
 }
 
+void readl(int a, char * input){
+    char * str = malloc(13);
+    scanf("%s", str);
+    int val = atoi(str);
+    char * hexval = malloc(10);
+    sprintf(hexval, "%08x", val);
+    hexval[8] = '\0';
+    char * hexToge = malloc(4);
+
+    seperateToToge(hexToge,hexval);
+
+    char * orig = malloc(10);
+    getStrFromReg(orig,a);
+    char * rev = malloc(10);
+    bigToLittleEndian(rev,orig);
+    char * rev2 = malloc(10);
+    bigToLittleEndian(rev2,input);
+    
+    int addr  = hexToDecimal(rev);
+    int displ = hexToDecimal(rev2);
+
+
+    int i = 0;
+    for(i = 0; i < 4; i++){
+        memory[addr + displ + i] = hexToge[i];
+    }
+
+}
+
 void doReadX(char input, char * bitval){
     char * tmp = malloc(strlen(bitval) - 1);
     bigToLittleEndian(tmp,bitval+2);
     tmp[strlen(bitval)-2] = '\0';
+    
+    int a = bitval[0] - '0';
 
     if(input == '0' && bitval[1] == 'f'){
         fprintf(stdout,"readb 0x%s(r%c)\n",tmp,bitval[0]);
         free(tmp);
     }
     else if(input == '1' && bitval[1] == 'f'){
+        readl(a,tmp);
         fprintf(stdout,"readl 0x%s(r%c)\n",tmp,bitval[0]);
         free(tmp);
     }
@@ -475,7 +835,7 @@ void doReadX(char input, char * bitval){
         fprintf(stderr,"ERROR <wonky13>\n");
 }
 
-void writeStuff(int a, char * val){
+void writeb(int a, char * val){
     char * orig = malloc(10);
     getStrFromReg(orig, a);
     char * rev = malloc(10);
@@ -489,6 +849,23 @@ void writeStuff(int a, char * val){
     free(orig);
 }
 
+void writel(int a, char * val){
+    char * orig = malloc(10);
+    getStrFromReg(orig, a);
+    char * rev = malloc(10);
+    bigToLittleEndian(rev,orig);
+
+    int addr = hexToDecimal(rev);
+    int displ = hexToDecimal(val);
+
+    int i =0;
+    for(i = 0; i < 4; i++){
+        fprintf(stderr,"%c", memory[addr+displ + i]);
+    }
+    free(rev);
+    free(orig);
+}
+
 void doWriteX(char input, char * bitval){
     char * tmp = malloc(strlen(bitval) - 1);
     bigToLittleEndian(tmp,bitval+2);
@@ -497,11 +874,12 @@ void doWriteX(char input, char * bitval){
     int a = bitval[0] - '0';
     
     if(input == '0' && bitval[1] == 'f'){
-        writeStuff(a,bitval+2);
+        writeb(a,bitval+2);
         fprintf(stdout,"writeb 0x%s(r%c)\n",tmp,bitval[0]);
         free(tmp);
     }
     else if(input == '1' && bitval[1] == 'f'){
+        writel(a,bitval+2);
         fprintf(stdout,"writel 0x%s(r%c)\n",tmp,bitval[0]);
         free(tmp);
     }
@@ -721,7 +1099,62 @@ int main(int argc, char ** argv){
             //printf("\n-%c-\n",memory[address]);
             free(tmp2);
             free(tmp);
- 
+        }
+        else if(buff[0] == '.' && buff[1] == 's'  && buff[2] == 't' && buff[3] == 'r' && buff[4] == 'i' && buff[5] == 'n' && buff[6] == 'g'){
+            i = 7;
+            
+            int strlent = strlen(buff);
+            while(isspace(buff[i])){
+                i++;
+            }
+            
+            int x = i;
+            while(!isspace(buff[i])){
+                i++;
+            }
+
+            char * tmp = malloc((i-x) + 2);
+            strncpy(tmp,buff+x,i-x);
+            tmp[i-x + 1] = '\0';
+            int address = hexToDecimal(tmp);
+            
+            while(isspace(buff[i])){
+                i++;
+            }
+            i++;
+            x = i;
+            while(buff[i] != '"'){
+                //fprintf(stderr, "%c\n", buff[i]);
+                i++;
+            }
+            i--;
+            //printf("\n%s\n", buff+x);
+
+            char * tmp2 = malloc((i-x) + 2);
+            strncpy(tmp2, buff+x, i-x+1);
+            tmp2[i-x + 1] = '\0';
+            //printf("\n%s\n",tmp2);
+            int strsize = i-x+1;
+
+            //printf("\n%d\n",opSize);
+            i = address;
+            int k;
+            for(k = 0; k< strsize; k++){
+                memory[i] = tmp2[k];
+                i++;
+            }
+
+
+            fprintf(stdout,"\nString 0x%08x (dec index): %d,-> Value : ", address, address);
+
+            for(i = address; i < address + strsize; i++){
+                fprintf(stdout, "%c", memory[i]);
+            }
+            fprintf(stdout, "\n");
+             
+            free(tmp2);
+            free(tmp);
+
         }
 
     }
@@ -824,11 +1257,9 @@ int main(int argc, char ** argv){
                 break;
             case '8':
                 doCall(fncode, bit);
-                IP = IP+5;
                 break;
             case '9':
                 doRet(fncode);
-                IP = IP+1;
                 break;
             case 'a':
                 doPushl(fncode, bit);
@@ -855,14 +1286,14 @@ int main(int argc, char ** argv){
                 return 0;
                 //doNoOp(fncode
         }
-    //fprintf(stdout, "\nIP : %d , insSize : %d\n",IP,insSize);
+    fprintf(stdout, "\nIP : %d , insSize : %d\n",IP,insSize);
     //free(tmp9);
     //free(bit);
     }
     while(notHalted && (IP < insSize));
     printf("\n");
 
-    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",OF,SF,ZF);
+    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
 
     return 0;
 
