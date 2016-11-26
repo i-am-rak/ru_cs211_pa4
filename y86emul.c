@@ -4,7 +4,7 @@
 #include <string.h>
 
 unsigned char * memory;
-int IP;
+unsigned int IP;
 
 struct {
     unsigned int OF : 1;
@@ -29,8 +29,11 @@ typedef union{
 
 regbyte registers[8][4];
 
-unsigned int hexToDecimal(char * hexAddress){
-    return strtol(hexAddress, NULL, 16);
+int hexToDecimal(char * hexAddress){
+    //return strtol(hexAddress, NULL, 16);
+    int x;
+    sscanf(hexAddress,"%x", &x);
+    return x;
 }
 
 void bigToLittleEndian(char * dest, char * original){
@@ -48,21 +51,21 @@ void bigToLittleEndian(char * dest, char * original){
 void seperateToToge(char * dest, char * input){
     int i = 0;
     int k;
+    char * tmp3 = calloc(1,4);
     for(k = 0; k< 8; k=k+2){
-       char * tmp3 = malloc(4);
         strncpy(tmp3,input+k,2);
         tmp3[2] = '\0'; 
         dest[i] = hexToDecimal(tmp3);
     //printf("%d,%s\n",memory[i],tmp3);
         i++;
-        free(tmp3);
     }
+    free(tmp3);
 }
 
 void getStrFromReg(char * dest, int i){
     
     int x = 0;
-    char * tmpa = malloc(3);
+    char * tmpa = calloc(1,5);
     int count = 0;
     for(x = 0; x < 4; x++){
         sprintf(tmpa, "%02x", registers[i][x].byte);
@@ -75,37 +78,39 @@ void getStrFromReg(char * dest, int i){
 }
 
 void storeInReg(int regi, char * val){
-    char * dest = malloc(strlen(val));
+    char * dest = calloc(1,strlen(val) + 1);
     seperateToToge(dest,val);
 
     int i = 0;
     for(i = 0; i < 4; i++){
         registers[regi][i].byte = dest[i];
     }
-    getStrFromReg(dest,regi);
-    fprintf(stdout, "\n%s\n", dest);
+    //getStrFromReg(dest,regi);
+    //fprintf(stdout, "\n%s\n", dest);
     free(dest);
 }
 
 void rrMovl(int a, int b){
     int i = 0;
     for(i = 0; i < 4; i++){
-        registers[b][i] = registers[a][i];
+        registers[b][i].byte = registers[a][i].byte;
     }
 }
 
 void rmMovl(int a, int b, char * val){
     //char dest[9] = getStrFromVal(b);
-    char * orig = malloc(10);
+    char * orig = calloc(1,10);
     getStrFromReg(orig,b);
-    char * rev = malloc(10);
+    char * rev = calloc(1,10);
     bigToLittleEndian(rev,orig);
     
     int addr  = hexToDecimal(rev);
     int displ = hexToDecimal(val);
+    //fprintf(stderr,"%d\n", displ);
     int i = 0;
     for(i = 0; i < 4; i++){
         memory[addr + displ + i] = registers[a][i].byte;
+        //fprintf(stdout,"%c\n%c\n", memory[addr + displ + i] , registers[a][i].byte);
     }
     free(orig);
     free(rev);
@@ -114,32 +119,34 @@ void rmMovl(int a, int b, char * val){
 
 void mrMovl(int a, int b, char * val){
 
-    char * orig = malloc(10);
+    char * orig = calloc(1,10);
     getStrFromReg(orig, b);
-    char * rev = malloc(10);
+    char * rev = calloc(1,10);
     bigToLittleEndian(rev,orig);
 
     int addr = hexToDecimal(rev);
     int displ = hexToDecimal(val);
     int i = 0;
     for(i = 0; i < 4; i++){
-        registers[a][i].byte = memory[addr + displ];
+        registers[a][i].byte = memory[addr + displ + i];
     }
+    getStrFromReg(orig,4);
+    //fprintf(stdout,"%s\n",orig);
     free(orig);
     free(rev);
 }
 
 void movSBL(int a, int b, char * val){
-    char * orig = malloc(10);
+    char * orig = calloc(1,10);
     getStrFromReg(orig, b);
-    char * rev = malloc(10);
+    char * rev = calloc(1,10);
     bigToLittleEndian(rev,orig);
 
     int addr = hexToDecimal(rev);
     int displ = hexToDecimal(val);
 
     char bit = memory[addr+displ];
-    char * tmp = malloc(4);
+    char * tmp = calloc(1,4);
     sprintf(tmp, "%02x",bit);
     tmp[2] = '\0';
     char sign = hexToDecimal("ff");
@@ -156,7 +163,7 @@ void movSBL(int a, int b, char * val){
 }
 
 void doNoOp(char input){
-    if(input = '0'){
+    if(input == '0'){
         IP = IP + 1;
         fprintf(stdout,"nop\n");
     }
@@ -165,7 +172,7 @@ void doNoOp(char input){
 }
 
 void doHalt(char input){
-    if(input = '0'){
+    if(input == '0'){
         fprintf(stdout,"halt\n");
     }
     else
@@ -185,7 +192,7 @@ void dorrmovl(char input, char * bitval){
 }
 
 void doirmovl(char input,char * bitval){
-    char * tmp = malloc(strlen(bitval) - 1);
+    char * tmp = calloc(1,strlen(bitval) + 1);
     bigToLittleEndian(tmp,bitval+2);
     tmp[strlen(bitval)-2] = '\0'; 
    
@@ -201,11 +208,12 @@ void doirmovl(char input,char * bitval){
 }
 
 void dormmovl(char input,char * bitval){
-    char * tmp = malloc(strlen(bitval) - 1);
+    char * tmp = calloc(1,strlen(bitval) + 1);
     bigToLittleEndian(tmp,bitval+2);
     tmp[strlen(bitval)-2] = '\0';
     int a = bitval[0] - '0';
     int b = bitval[1] - '0';
+    
     if(input == '0'){
         rmMovl(a,b,tmp);
         fprintf(stdout,"rmmovl r%c,0x%s(r%c)\n",bitval[0],tmp,bitval[1]);
@@ -216,7 +224,7 @@ void dormmovl(char input,char * bitval){
 }
 
 void domrmovl(char input,char * bitval){
-    char * tmp = malloc(strlen(bitval) - 1);
+    char * tmp = calloc(1,strlen(bitval) + 1);
     bigToLittleEndian(tmp,bitval+2);
     tmp[strlen(bitval)-2] = '\0';
     int a = bitval[0] - '0';
@@ -224,22 +232,23 @@ void domrmovl(char input,char * bitval){
 
     if(input == '0'){
         mrMovl(a,b,tmp);
-        fprintf(stdout,"mrmovl 0x%s(r%c),r%c\n",tmp, bitval[0],bitval[1]);
+        fprintf(stdout,"mrmovl 0x%s(r%c),r%c\n",tmp, bitval[1],bitval[0]);
     }
     else
         fprintf(stderr,"ERROR <wonky6>\n");
 }
 
 void doAdd(int a, int b){
-    char * rev = malloc(10);
+    
+    char * rev = calloc(1,10);
     getStrFromReg(rev, a);
     printf("%s\n",rev);
     
-    char * val1str = malloc(10);
+    char * val1str = calloc(1,10);
     bigToLittleEndian(val1str,rev);
     
     int val1 = hexToDecimal(val1str);
-    char * val2str = malloc(10);
+    char * val2str = calloc(1,10);
     
     getStrFromReg(rev, b);
     printf("%s\n",rev);
@@ -266,14 +275,17 @@ void doAdd(int a, int b){
         flags.ZF = 1;
     else
         flags.ZF = 0;
+    
+    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
 
-    char * tmp = malloc(9);
+
+    char * tmp = calloc(1,9);
 
     sprintf(tmp,"%08x",tmpres);
     
     bigToLittleEndian(rev,tmp);
     storeInReg(b,rev);
-
+    free(tmp);
     free(val2str);
     free(val1str);
     free(rev);
@@ -281,22 +293,22 @@ void doAdd(int a, int b){
 }
 
 void doSubl(int a, int b){
-    char * rev = malloc(10);
+    char * rev = calloc(1,10);
     getStrFromReg(rev, a);
     printf("%s\n",rev);
     
-    char * val1str = malloc(10);
+    char * val1str = calloc(1,10);
     bigToLittleEndian(val1str,rev);
     
     int val1 = hexToDecimal(val1str);
-    char * val2str = malloc(10);
+    char * val2str = calloc(1,10);
     
     getStrFromReg(rev, b);
     printf("%s\n",rev);
     bigToLittleEndian(val2str,rev);
     
     int val2 = hexToDecimal(val2str);
-    int tmpres = val1 - val2;
+    int tmpres = val2 - val1;
     //printf("%d + %d = %d\n", val1, val2, tmpres); 
     
     if(val1 < 0 && val2 > 0 && tmpres > 0){
@@ -318,13 +330,17 @@ void doSubl(int a, int b){
     else
         flags.ZF = 0;
 
-    char * tmp = malloc(9);
+    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+
+
+    char * tmp = calloc(1,9);
 
     sprintf(tmp,"%08x",tmpres);
-    
+    tmp[8] = '\0';
     bigToLittleEndian(rev,tmp);
     storeInReg(b,rev);
 
+    free(tmp);
     free(val2str);
     free(val1str);
     free(rev);
@@ -334,13 +350,15 @@ void doAndl(int a, int b){
 
     int i = 0;
     for(i = 0; i < 4; i++){
+        printf("orig : %08x, %08x \n", registers[a][i].byte , registers[b][i].byte);
         registers[b][i].byte = registers[a][i].byte & registers[b][i].byte;
+        printf("val : %08x\n", registers[b][i].byte);
     }
     
-    char * res = malloc(10);
+    char * res = calloc(1,10);
     getStrFromReg(res, b);
      
-    char * val1str = malloc(10);
+    char * val1str = calloc(1,10);
     bigToLittleEndian(val1str,res);
     
     int val1 = hexToDecimal(val1str);
@@ -356,6 +374,8 @@ void doAndl(int a, int b){
     else
         flags.ZF = 0; 
     //printf("%s\n",res);
+    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+
     free(val1str);
     free(res);
 
@@ -368,10 +388,10 @@ void doXorl(int a, int b){
         registers[b][i].byte = registers[a][i].byte ^ registers[b][i].byte;
     }
     
-    char * res = malloc(10);
+    char * res = calloc(1,10);
     getStrFromReg(res, b);
      
-    char * val1str = malloc(10);
+    char * val1str = calloc(1,10);
     bigToLittleEndian(val1str,res);
     
     int val1 = hexToDecimal(val1str);
@@ -387,29 +407,31 @@ void doXorl(int a, int b){
     else
         flags.ZF = 0; 
     //printf("%s\n",res);
+    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+    
     free(val1str);
     free(res);
 
 }
 
 void doMull(int a, int b){
-    char * rev = malloc(10);
+    char * rev = calloc(1,10);
     getStrFromReg(rev, a);
     printf("%s\n",rev);
     
-    char * val1str = malloc(10);
+    char * val1str = calloc(1,10);
     bigToLittleEndian(val1str,rev);
     
     int val1 = hexToDecimal(val1str);
-    char * val2str = malloc(10);
+    char * val2str = calloc(1,10);
     
     getStrFromReg(rev, b);
-    printf("%s\n",rev);
+    //printf("%s\n",rev);
     bigToLittleEndian(val2str,rev);
     
     int val2 = hexToDecimal(val2str);
     int tmpres = val1 * val2;
-    //printf("%d + %d = %d\n", val1, val2, tmpres);
+    fprintf(stdout,"%d * %d = %d\n", val1, val2, tmpres);
     if(val1 > 0 && val2 > 0 && tmpres < 0){
         flags.OF = 1;
     }
@@ -432,13 +454,16 @@ void doMull(int a, int b){
     else
         flags.ZF = 0;
 
-    char * tmp = malloc(9);
+    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+
+    char * tmp = calloc(1,9);
 
     sprintf(tmp,"%08x",tmpres);
-    
+    tmp[8] = '\0';
     bigToLittleEndian(rev,tmp);
     storeInReg(b,rev);
 
+    free(tmp);
     free(val2str);
     free(val1str);
     free(rev);
@@ -446,12 +471,12 @@ void doMull(int a, int b){
 }
 
 void doCmpl(int a, int b){
-    char * rev = malloc(10);
+    char * rev = calloc(1,10);
     getStrFromReg(rev, a);
-    char * val1str = malloc(10);
+    char * val1str = calloc(1,10);
     bigToLittleEndian(val1str,rev);
     int val1 = hexToDecimal(val1str);
-    char * val2str = malloc(10);
+    char * val2str = calloc(1,10);
     getStrFromReg(rev, b);
     bigToLittleEndian(val2str,rev);
     int val2 = hexToDecimal(val2str);
@@ -471,6 +496,8 @@ void doCmpl(int a, int b){
     else{
         flags.SF = 0;
     }
+
+    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
 
     free(val2str);
     free(val1str);
@@ -514,11 +541,13 @@ void doOper(char input, char * bitval){
 }
 
 void doJump(char * dest){
-    fprintf(stdout, "\njmpcompleted\n");
     IP = hexToDecimal(dest);
 }
 
 void doJle(char * dest){
+    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+
+
     if((flags.SF ^ flags.OF) || flags.ZF){
         IP = hexToDecimal(dest);
     }
@@ -527,6 +556,9 @@ void doJle(char * dest){
 }
 
 void doJl(char * dest){
+    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+
+
     if(flags.SF ^ flags.OF){
         IP = hexToDecimal(dest);
     }
@@ -535,6 +567,9 @@ void doJl(char * dest){
 }
 
 void doJe(char * dest){
+    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+
+
     if(flags.ZF == 1){
         IP = hexToDecimal(dest);
     }
@@ -543,14 +578,19 @@ void doJe(char * dest){
 }
 
 void doJne(char * dest){
-    if(!flags.ZF == 1){
+    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+
+
+    if(flags.ZF != 1){
         IP = hexToDecimal(dest);
     }
     else
         IP = IP + 5;
 }
 
-void doJGe(char * dest){
+void doJge(char * dest){
+    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+
     if(!(flags.SF ^ flags.OF)){
         IP = hexToDecimal(dest);
     }
@@ -559,6 +599,9 @@ void doJGe(char * dest){
 }
 
 void doJg(char * dest){
+    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+
+
     if(!(flags.SF^flags.OF) && !flags.ZF){
         IP = hexToDecimal(dest);
     }
@@ -568,11 +611,11 @@ void doJg(char * dest){
 
 void doJmp(char input, char * bitval){
     
-    char * dest = malloc(9);
+    char * dest = calloc(1,9);
     strncpy(dest, bitval,8);
     dest[8] = '\0';
 
-    char * tmp = malloc(strlen(dest) + 1);
+    char * tmp = calloc(1,strlen(dest) + 1);
     bigToLittleEndian(tmp,dest);
     tmp[strlen(dest)] = '\0';
     switch(input){
@@ -584,12 +627,12 @@ void doJmp(char input, char * bitval){
             break;
         case '1':
             fprintf(stdout,"jle 0x%s\n", tmp);
-            IP = IP+5;
+            doJle(tmp);
             free(tmp);
             break;
         case '2':
             fprintf(stdout,"jl 0x%s\n", tmp);
-            IP = IP+5;          
+            doJl(tmp);         
             free(tmp);
             break;
         case '3':
@@ -600,17 +643,17 @@ void doJmp(char input, char * bitval){
             break;
         case '4':
             fprintf(stdout,"jne 0x%s\n", tmp);
-            IP = IP+5;
+            doJne(tmp);
             free(tmp);
             break;
         case '5':
             fprintf(stdout,"jge 0x%s\n", tmp);
-            IP = IP+5;
+            doJge(tmp);
             free(tmp);
             break;
         case '6':
             fprintf(stdout,"jg 0x%s\n", tmp);
-            IP = IP+5;
+            doJg(tmp);
             free(tmp);
             break;
         default:
@@ -621,19 +664,20 @@ void doJmp(char input, char * bitval){
 }
 
 void call(char * val){
-    char * rev = malloc(10);
-    char * toge = malloc(10);
+    char * rev = calloc(1,10);
+    char * toge = calloc(1,10);
       
     getStrFromReg(rev, 4);
-    char * val2str = malloc(10);
+    char * val2str = calloc(1,10);
     bigToLittleEndian(val2str,rev);
     int espa = hexToDecimal(val2str);
     espa = espa - 4;
  
-    char * tmp = malloc(10);
-    sprintf(tmp,"%08x",IP+5);
+    char * tmp = calloc(1,10);
+    int pf = IP+5;
+    sprintf(tmp,"%08x",pf);
     bigToLittleEndian(rev,tmp);
-
+    tmp[8] = '\0';
     seperateToToge(toge,rev);
 
     int i = 0;
@@ -642,21 +686,28 @@ void call(char * val){
     }
     
     //bigToLittleEndian(val2str,val);
+    fprintf(stdout,"%d\n",hexToDecimal(val));
     IP = hexToDecimal(val);
 
-    sprintf(tmp,"%08x",espa);
-    
-    bigToLittleEndian(rev,tmp);
+    char * tmp2 = calloc(1,10);
+    sprintf(tmp2,"%08x",espa);
+    tmp2[8] = '\0';
+    bigToLittleEndian(rev,tmp2);
     storeInReg(4,rev);
+    free(tmp2);
+    free(tmp);
+    free(val2str);
+    free(toge);
+    free(rev);
  
 }
 
 void doCall(char input, char * bitval){
-    char * dest = malloc(9);
+    char * dest = calloc(1,9);
     strncpy(dest, bitval,8);
     dest[8] = '\0';
 
-    char * tmp = malloc(strlen(dest) + 1);
+    char * tmp = calloc(1,strlen(dest) + 1);
     bigToLittleEndian(tmp,dest);
     tmp[strlen(dest)] = '\0';
 
@@ -665,30 +716,36 @@ void doCall(char input, char * bitval){
         fprintf(stdout,"call 0x%s\n", tmp);
     }
     else
-        fprintf(stderr,"ERROR <wonky9>\n"); 
+        fprintf(stderr,"ERROR <wonky9>\n");
+    free(tmp);
+    free(dest);
 }
 
 void ret(){
     
-    char * rev = malloc(10);
+    char * rev = calloc(1,10);
     
     getStrFromReg(rev, 4);
-    char * val2str = malloc(10);
+    rev[8] = '\0';
+    char * val2str = calloc(1,10);
     bigToLittleEndian(val2str,rev);
+    val2str[8] = '\0';
     int espa = hexToDecimal(val2str);
-    
-    char * returnval = malloc(5);
+    //espa = espa+4; 
+    unsigned char * returnval = calloc(1,5);
 
     int i = 0;
     for(i = 0; i < 4; i++){
          returnval[i] = memory[espa + i];
+         //fprintf(stderr,"new : %02x\n origi : %02x\n",returnval[i],memory[espa + i]);
+
     }
 
     returnval[4] = '\0';
 
     int x = 0;
-    char * tmpa = malloc(3);
-    char * dest = malloc(10);
+    char * tmpa = calloc(1,5);
+    char * dest = calloc(1,10);
     int count = 0;
     for(x = 0; x < 4; x++){
         sprintf(tmpa, "%02x", returnval[x]);
@@ -699,17 +756,29 @@ void ret(){
     dest[8] = '\0';
 
     bigToLittleEndian(val2str,dest);
+    //fprintf(stderr,"val: %s\n",val2str);
+    //fprintf(stderr,"oct : %01x\n oct 2:%08x\n",395,511);
     IP = hexToDecimal(val2str);
+    /*if(IP == 511){
+        IP = 395;
+    }*/
+    fprintf(stdout,"\n-%d-\n", IP);
 
     espa = espa + 4;
 
-    char * tmp = malloc(10);
+    char * tmp = calloc(1,10);
     sprintf(tmp,"%08x",espa);
-    
-    bigToLittleEndian(rev,tmp);
-    storeInReg(4,rev);
-    
- 
+    tmp[8] = '\0';
+    char * rev2 = calloc(1,10);
+    bigToLittleEndian(rev2,tmp);
+    storeInReg(4,rev2);
+    free(rev2);
+    free(tmp);
+    free(dest);
+    free(tmpa);
+    free(returnval);
+    free(val2str);
+    free(rev); 
 }
 
 void doRet(char input){
@@ -722,25 +791,28 @@ void doRet(char input){
 }
 
 void pushl(int a){
-    char * rev = malloc(10);
+    char * rev = calloc(1,10);
     
     getStrFromReg(rev, 4);
-    char * val2str = malloc(10);
+    rev[8] = '\0';
+    char * val2str = calloc(1,10);
     bigToLittleEndian(val2str,rev);
     int espa = hexToDecimal(val2str);
     espa = espa - 4;
-   
+    
     int i = 0;
     for(i = 0; i < 4; i++){
         memory[espa + i] = registers[a][i].byte;
     }
 
-    char * tmp = malloc(10);
+    char * tmp = calloc(1,10);
     sprintf(tmp,"%08x",espa);
-    
+    tmp[8] = '\0';
     bigToLittleEndian(rev,tmp);
     storeInReg(4,rev);
- 
+    free(tmp);
+    free(val2str);
+    free(rev);
 }
 
 void doPushl(char input, char * bitval){
@@ -754,10 +826,11 @@ void doPushl(char input, char * bitval){
 }
 
 void popl(int a){
-    char * rev = malloc(10);
+    char * rev = calloc(1,10);
     
     getStrFromReg(rev, 4);
-    char * val2str = malloc(10);
+    rev[8] = '\0';
+    char * val2str = calloc(1,10);
     bigToLittleEndian(val2str,rev);
     int espa = hexToDecimal(val2str);
    
@@ -768,11 +841,14 @@ void popl(int a){
 
     espa = espa + 4;
 
-    char * tmp = malloc(10);
+    char * tmp = calloc(1,10);
     sprintf(tmp,"%08x",espa);
     
     bigToLittleEndian(rev,tmp);
     storeInReg(4,rev);
+    free(tmp);
+    free(val2str);
+    free(rev);
 
 }
 
@@ -787,46 +863,66 @@ void doPopl(char input, char * bitval){
 }
 
 void readl(int a, char * input){
-    char * str = malloc(13);
+    char * str = calloc(1,100);
+    //fprintf(stdout,"test");
     scanf("%s", str);
     int val = atoi(str);
-    char * hexval = malloc(10);
+    //fprintf(stderr,"%s", str);
+    if(str == 0 || val == 0){
+        flags.ZF = 1;
+    }
+    else
+        flags.ZF = 0;
+    
+    //fprintf(stderr, "-\n%d\n-", val);
+    char * hexval = calloc(1,10);
     sprintf(hexval, "%08x", val);
     hexval[8] = '\0';
-    char * hexToge = malloc(4);
+    char * hexToge = calloc(1,6);
+    char * rev3 = calloc(1,10);
+    bigToLittleEndian(rev3,hexval);
+    rev3[8] = '\0';
+    //fprintf(stderr,"%s\n", rev3);
+    seperateToToge(hexToge,rev3);
 
-    seperateToToge(hexToge,hexval);
-
-    char * orig = malloc(10);
+    char * orig = calloc(1,10);
     getStrFromReg(orig,a);
-    char * rev = malloc(10);
+    char * rev = calloc(1,10);
     bigToLittleEndian(rev,orig);
-    char * rev2 = malloc(10);
-    bigToLittleEndian(rev2,input);
+    //char * rev2 = malloc(10);
+    //bigToLittleEndian(rev2,input);
     
     int addr  = hexToDecimal(rev);
-    int displ = hexToDecimal(rev2);
-
-
+    int displ = hexToDecimal(input);
+    
     int i = 0;
     for(i = 0; i < 4; i++){
+        //fprintf(stderr,"-%02x-",hexToge[i]);
         memory[addr + displ + i] = hexToge[i];
     }
-
+    //fprintf(stderr,"\n");
+    free(rev);
+    free(orig);
+    free(rev3);
+    free(hexToge);
+    free(hexval);
+    free(str);
 }
 
 void doReadX(char input, char * bitval){
-    char * tmp = malloc(strlen(bitval) - 1);
+    char * tmp = calloc(1, strlen(bitval) + 1);
     bigToLittleEndian(tmp,bitval+2);
     tmp[strlen(bitval)-2] = '\0';
     
     int a = bitval[0] - '0';
 
     if(input == '0' && bitval[1] == 'f'){
+        //readl(a,tmp);
         fprintf(stdout,"readb 0x%s(r%c)\n",tmp,bitval[0]);
         free(tmp);
     }
     else if(input == '1' && bitval[1] == 'f'){
+        //fprintf(stdout,"test");
         readl(a,tmp);
         fprintf(stdout,"readl 0x%s(r%c)\n",tmp,bitval[0]);
         free(tmp);
@@ -836,9 +932,9 @@ void doReadX(char input, char * bitval){
 }
 
 void writeb(int a, char * val){
-    char * orig = malloc(10);
+    char * orig = calloc(1,10);
     getStrFromReg(orig, a);
-    char * rev = malloc(10);
+    char * rev = calloc(1,10);
     bigToLittleEndian(rev,orig);
 
     int addr = hexToDecimal(rev);
@@ -850,24 +946,32 @@ void writeb(int a, char * val){
 }
 
 void writel(int a, char * val){
-    char * orig = malloc(10);
+    char * orig = calloc(1,10);
     getStrFromReg(orig, a);
-    char * rev = malloc(10);
+    char * rev = calloc(1,10);
     bigToLittleEndian(rev,orig);
 
     int addr = hexToDecimal(rev);
     int displ = hexToDecimal(val);
 
     int i =0;
+    char * tmpa = calloc(1,5);
     for(i = 0; i < 4; i++){
-        fprintf(stderr,"%c", memory[addr+displ + i]);
+        sprintf(tmpa,"%02x", memory[addr+displ + i]);
+        rev[2 * i] = tmpa[0];
+        rev[(2 * i) + 1] = tmpa[1];
     }
+    
+    bigToLittleEndian(orig,rev);
+    int res = hexToDecimal(orig);
+    fprintf(stderr,"%d",res);
+    free(tmpa);
     free(rev);
     free(orig);
 }
 
 void doWriteX(char input, char * bitval){
-    char * tmp = malloc(strlen(bitval) - 1);
+    char * tmp = calloc(1,strlen(bitval) + 1);
     bigToLittleEndian(tmp,bitval+2);
     tmp[strlen(bitval)-2] = '\0';
 
@@ -888,13 +992,13 @@ void doWriteX(char input, char * bitval){
 }
 
 void doMovsbl(char input, char * bitval){
-    char * tmp = malloc(strlen(bitval) - 1);
+    char * tmp = calloc(1,strlen(bitval) + 1);
     bigToLittleEndian(tmp,bitval+2);
     tmp[strlen(bitval)-2] = '\0';
     int a = bitval[0] - '0';
     int b = bitval[1] - '0';
     if(input == '0'){
-        movSBL(a,b,bitval+2);
+        movSBL(a,b,tmp);
         fprintf(stdout,"movsbl 0x%s(r%c),r%c\n",tmp,bitval[1], bitval[0]);
         free(tmp);
     }
@@ -903,15 +1007,31 @@ void doMovsbl(char input, char * bitval){
 }
 
 int main(int argc, char ** argv){
+    
+    
+    /*int x = hexToDecimal("fffffffc");
+    fprintf(stderr,"%d\n",x);*/
+    
+    //int po;
+    //sscanf("fffffffc","%x",&po);
+    //printf("%d",po);
 
+
+    /*for(int l = 0;l < 8; l++){
+        for(int j = 0; j < 4; j++){
+            registers[l][j].byte = 243;
+        }
+    }*/
     FILE* fp;
     int bufferSize = 10000;
-    char * buff = malloc(10000+1);
+    char * buff = calloc(1,10000+1);
 
     fp = fopen(argv[1],"r");
     
     if(fp == NULL){
         fprintf(stderr,"ERROR: <File not found>\n");
+        free(buff);
+        fclose(fp);
         return 0;
     }
 
@@ -933,18 +1053,18 @@ int main(int argc, char ** argv){
             while(!isspace(buff[i])){
                 i++;
             }
-            char * tmp = malloc(i-x + 2);
+            char * tmp = calloc(1,i-x + 2);
             strncpy(tmp,buff+x,i-x);
             tmp[i-x + 1] = '\0';
             size = hexToDecimal(tmp);
             bufferSize = size;
             buff = realloc(buff,bufferSize);
             //printf("%d\n", size);
-            memory = malloc(size);
-            //int l = 0;
-            //for(l = 0; l < size; l++){
-            //    memory[l] = 0;
-            //}
+            memory = calloc(1,size);
+            int l = 0;
+            for(l = 0; l < size; l++){
+                memory[l] = 0;
+            }
 
             fprintf(stdout,"Memory created, intialized to 0\n");
 
@@ -955,7 +1075,7 @@ int main(int argc, char ** argv){
         
         else if(buff[0] == '.' && buff[1] == 'l'  && buff[2] == 'o' && buff[3] == 'n' && buff[4] == 'g'){
             i = 5;
-            int strlent = strlen(buff);
+            //int strlent = strlen(buff);
             while(isspace(buff[i])){
                 i++;
             }
@@ -964,7 +1084,7 @@ int main(int argc, char ** argv){
                 i++;
             }
 
-            char * tmp = malloc((i-x) + 2);
+            char * tmp = calloc(1,(i-x) + 2);
             strncpy(tmp,buff+x,i-x);
             tmp[i-x + 1] = '\0';
             int address = hexToDecimal(tmp);
@@ -977,7 +1097,7 @@ int main(int argc, char ** argv){
                 i++;
             }
 
-            char * tmp2 = malloc(10);;
+            char * tmp2 = calloc(1,10);
             int k = 0;
             for(k = 0; k < 8; k++){
                 tmp2[k] = '0';
@@ -989,8 +1109,8 @@ int main(int argc, char ** argv){
 
             //printf("Long Address 0x%s (dec index): %d , Value : %s\n",tmp,address,tmp2);
             i = address;
+            char * tmp3 = calloc(1,3);
             for(k = address; k< address+ 8; k=k+2){
-                char * tmp3 = malloc(3);
                 strncpy(tmp3,tmp2-address+k,2); 
                 tmp3[2] = '\0';
                 memory[i] = hexToDecimal(tmp3);
@@ -998,7 +1118,7 @@ int main(int argc, char ** argv){
                 i++;
                 //free(tmp3);
             }
-            //free(tmp3);
+            free(tmp3);
             free(tmp2);
 
             fprintf(stdout,"Long Address 0x%08x (dec index): %d, Value : %d%d%d%d , %02x%02x%02x%02x\n", address, address, memory[address], memory[address+1], memory[address+2], memory[address+3], memory[address], memory[address+1], memory[address+2], memory[address+3]);
@@ -1007,7 +1127,7 @@ int main(int argc, char ** argv){
 
         else if(buff[0] == '.' && buff[1] == 'b'  && buff[2] == 'y' && buff[3] == 't' && buff[4] == 'e'){
             i = 5;
-            int strlent = strlen(buff);
+            //int strlent = strlen(buff);
             while(isspace(buff[i])){
                 i++;
             }
@@ -1016,7 +1136,7 @@ int main(int argc, char ** argv){
                 i++;
             }
 
-            char * tmp = malloc((i-x) + 2);
+            char * tmp = calloc(1,(i-x) + 2);
             strncpy(tmp,buff+x,i-x);
             tmp[i-x + 1] = '\0';
             int address = hexToDecimal(tmp);
@@ -1025,7 +1145,7 @@ int main(int argc, char ** argv){
                 i++;
             }
 
-            char * tmp2 = malloc(4);
+            char * tmp2 = calloc(1,4);
             strncpy(tmp2,buff+i,2);
             tmp2[2] = '\0';
 
@@ -1040,7 +1160,7 @@ int main(int argc, char ** argv){
         else if(buff[0] == '.' && buff[1] == 't'  && buff[2] == 'e' && buff[3] == 'x' && buff[4] == 't'){
             i = 5;
             
-            int strlent = strlen(buff);
+            //int strlent = strlen(buff);
             while(isspace(buff[i])){
                 i++;
             }
@@ -1050,7 +1170,7 @@ int main(int argc, char ** argv){
                 i++;
             }
 
-            char * tmp = malloc((i-x) + 2);
+            char * tmp = calloc(1,(i-x) + 2);
             strncpy(tmp,buff+x,i-x);
             tmp[i-x + 1] = '\0';
             int address = hexToDecimal(tmp);
@@ -1064,7 +1184,7 @@ int main(int argc, char ** argv){
             }
             //printf("\n%s\n", buff+x);
 
-            char * tmp2 = malloc((i-x) + 2);
+            char * tmp2 = calloc(1,(i-x) + 2);
             strncpy(tmp2, buff+x, i-x);
             tmp2[i-x + 1] = '\0';
             //printf("\n%s\n",tmp2);
@@ -1073,8 +1193,8 @@ int main(int argc, char ** argv){
             //printf("\n%d\n",opSize);
             i = address;
             int k;
+            char * tmp3 = calloc(1,3);
             for(k = address; k< address+ opSize; k=k+2){
-                char * tmp3 = malloc(3);
                 strncpy(tmp3,tmp2-address+k,2);
                 tmp3[2] = '\0'; 
                 memory[i] = hexToDecimal(tmp3);
@@ -1082,6 +1202,7 @@ int main(int argc, char ** argv){
                 i++;
                 //free(tmp3);
             }
+            free(tmp3);
 
             fprintf(stdout,"\nText code 0x%08x (dec index): %d,-> Value : ", address, address);
              
@@ -1103,7 +1224,7 @@ int main(int argc, char ** argv){
         else if(buff[0] == '.' && buff[1] == 's'  && buff[2] == 't' && buff[3] == 'r' && buff[4] == 'i' && buff[5] == 'n' && buff[6] == 'g'){
             i = 7;
             
-            int strlent = strlen(buff);
+            //int strlent = strlen(buff);
             while(isspace(buff[i])){
                 i++;
             }
@@ -1113,7 +1234,7 @@ int main(int argc, char ** argv){
                 i++;
             }
 
-            char * tmp = malloc((i-x) + 2);
+            char * tmp = calloc(1,(i-x) + 2);
             strncpy(tmp,buff+x,i-x);
             tmp[i-x + 1] = '\0';
             int address = hexToDecimal(tmp);
@@ -1130,7 +1251,7 @@ int main(int argc, char ** argv){
             i--;
             //printf("\n%s\n", buff+x);
 
-            char * tmp2 = malloc((i-x) + 2);
+            char * tmp2 = calloc(1,(i-x) + 2);
             strncpy(tmp2, buff+x, i-x+1);
             tmp2[i-x + 1] = '\0';
             //printf("\n%s\n",tmp2);
@@ -1159,13 +1280,16 @@ int main(int argc, char ** argv){
 
     }
     free(buff);
+    fclose(fp);
+
     int line = 0;
     int notHalted = 1;
     //printf("%d%c\n",IP,memory[IP]);
     int insSize = (opSize/2) + IP;
+
     do{
         line++;
-        char * tmp9 = malloc(3);
+        char * tmp9 = calloc(1,3);
         sprintf(tmp9,"%02x",memory[IP]);
         char opcode = tmp9[0];
         //printf("*%c*\n",tmp9[0]);
@@ -1178,7 +1302,7 @@ int main(int argc, char ** argv){
 
         //char argcode = 0;
         //char arg2code = 0;
-        char * bit = malloc(13);
+        char * bit = calloc(1,13);
         int j = 0;
         for(j =0; j< 13; j++){
             bit[j] = '\0';
@@ -1222,6 +1346,7 @@ int main(int argc, char ** argv){
                 }
             }
         } 
+        free(tmp9);
         
         switch(opcode){
             case '0':
@@ -1271,6 +1396,7 @@ int main(int argc, char ** argv){
                 break;
             case 'c':
                 doReadX(fncode, bit);
+                //fprintf(stdout, "?????");
                 IP = IP+6;
                 break;
             case 'd':
@@ -1286,15 +1412,34 @@ int main(int argc, char ** argv){
                 return 0;
                 //doNoOp(fncode
         }
+    free(bit);
     fprintf(stdout, "\nIP : %d , insSize : %d\n",IP,insSize);
+    //char * tmpad = malloc(10);
+    //getStrFromReg(tmpad,7);
+    //fprintf(stdout, "\nreg7 : %s \n", tmpad);
     //free(tmp9);
     //free(bit);
     }
-    while(notHalted && (IP < insSize));
+    while(notHalted);
+    /*
     printf("\n");
+    storeInReg(6,"12345678");
+    storeInReg(7,"00000000");
+    storeInReg(4,"40100000");
+    rmMovl(6,7,"00000000");
 
-    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+    for(int f = 0; f < 4; f++){
+        fprintf(stdout,"%02x", memory[f]);
+    }
+    //call("05000000");
 
+    char * testingstr = calloc(1,10);
+    getStrFromReg(testingstr,7);
+    //fprintf(stdout,"\n%s\n", testingstr);
+
+    //fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+    */
+    free(memory);
     return 0;
 
 }
