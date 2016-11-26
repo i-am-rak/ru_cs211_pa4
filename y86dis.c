@@ -15,7 +15,7 @@ void bigToLittleEndian(char * dest, char * original){
 }
 
 void doNoOp(char input){
-    if(input = '0'){
+    if(input == '0'){
         //IP = IP + 1;
         printf("nop\n");
     }
@@ -24,7 +24,7 @@ void doNoOp(char input){
 }
 
 void doHalt(char input){
-    if(input = '0'){
+    if(input == '0'){
         printf("halt\n");
     }
     else
@@ -72,7 +72,7 @@ void domrmovl(char input,char * bitval){
     tmp[strlen(bitval)-2] = '\0';
 
     if(input == '0'){
-        printf("mrmovl 0x%s(r%c),r%c\n",tmp, bitval[0],bitval[1]);
+        printf("mrmovl 0x%s(r%c),r%c\n",tmp, bitval[1],bitval[0]);
     }
     else
         printf("ERROR <wonky6>\n");
