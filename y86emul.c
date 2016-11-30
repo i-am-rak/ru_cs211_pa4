@@ -2,10 +2,15 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <signal.h>
+
+static volatile int keepRunning = 1;
 
 unsigned char * memory;
 unsigned int IP;
 
+int AOK = 0;
+int size = 0;
 struct {
     unsigned int OF : 1;
     unsigned int ZF : 1;
@@ -34,6 +39,15 @@ int hexToDecimal(char * hexAddress){
     int x;
     sscanf(hexAddress,"%x", &x);
     return x;
+}
+
+void intHandler(int dummy) {
+    if(AOK == 1)
+        fprintf(stdout,"\nSignal interupt detected : Status Code AOK\n");
+    else
+        fprintf(stdout,"\nSignal interupt detected : Code not executed\n");
+    keepRunning = 0;
+    exit(1);
 }
 
 void bigToLittleEndian(char * dest, char * original){
@@ -109,6 +123,10 @@ void rmMovl(int a, int b, char * val){
     //fprintf(stderr,"%d\n", displ);
     int i = 0;
     for(i = 0; i < 4; i++){
+        if((addr + displ + i) > size || (addr + displ + i) < 0){
+            printf("Status code: ADR. Program exiting.\n");
+            exit(1);
+        }
         memory[addr + displ + i] = registers[a][i].byte;
         //fprintf(stdout,"%c\n%c\n", memory[addr + displ + i] , registers[a][i].byte);
     }
@@ -128,6 +146,10 @@ void mrMovl(int a, int b, char * val){
     int displ = hexToDecimal(val);
     int i = 0;
     for(i = 0; i < 4; i++){
+        if((addr + displ + i) > size || (addr + displ + i) < 0){
+            fprintf(stderr,"Status code : ADR. Program exiting.\n");
+            exit(1);
+        }
         registers[a][i].byte = memory[addr + displ + i];
     }
     getStrFromReg(orig,4);
@@ -144,7 +166,10 @@ void movSBL(int a, int b, char * val){
 
     int addr = hexToDecimal(rev);
     int displ = hexToDecimal(val);
-
+    if((addr + displ) > size || (addr + displ) < 0){
+        fprintf(stderr, "Status code: ADR. Program exiting.\n");
+        exit(1);
+    }
     char bit = memory[addr+displ];
     char * tmp = calloc(1,4);
     sprintf(tmp, "%02x",bit);
@@ -165,18 +190,22 @@ void movSBL(int a, int b, char * val){
 void doNoOp(char input){
     if(input == '0'){
         IP = IP + 1;
-        fprintf(stdout,"nop\n");
+        //fprintf(stdout,"nop\n");
     }
-    else
-        fprintf(stderr,"ERROR <wonky1>\n");
+    else{
+        fprintf(stderr,"Status code : INS. Program exiting.\n");
+        exit(1);
+    }
 }
 
 void doHalt(char input){
     if(input == '0'){
-        fprintf(stdout,"halt\n");
+        //fprintf(stdout,"halt\n");
     }
-    else
-        fprintf(stderr,"ERROR <wonky2>\n");
+    else{
+        fprintf(stderr,"Status code : INS. Program exiting.\n");
+        exit(1);
+    }
 }
 
 void dorrmovl(char input, char * bitval){
@@ -185,12 +214,13 @@ void dorrmovl(char input, char * bitval){
     int b = bitval[1] - '0';
     if(input == '0'){
         rrMovl(a ,b);
-        fprintf(stdout,"rrmovl r%c,r%c\n",bitval[0],bitval[1]);
+        //fprintf(stdout,"rrmovl r%c,r%c\n",bitval[0],bitval[1]);
     }
-    else
-        fprintf(stdout,"ERROR <wonky3>\n");
+    else{
+        fprintf(stdout,"Status code : INS. Program exiting.\n");
+        exit(1);   
+    }
 }
-
 void doirmovl(char input,char * bitval){
     char * tmp = calloc(1,strlen(bitval) + 1);
     bigToLittleEndian(tmp,bitval+2);
@@ -199,12 +229,13 @@ void doirmovl(char input,char * bitval){
     if(input == '0' && bitval[0] == 'f'){
         int regi = bitval[1] - '0';
         storeInReg(regi,bitval+2);
-        fprintf(stdout,"irmovl 0x%s,r%c\n",tmp,bitval[1]);
+        //fprintf(stdout,"irmovl 0x%s,r%c\n",tmp,bitval[1]);
         free(tmp);
     }
-    else
-        fprintf(stderr,"ERROR <wonky4>\n");
-
+    else{
+        fprintf(stderr,"Status code : INS. Program exiting.\n");
+        exit(1);
+    }
 }
 
 void dormmovl(char input,char * bitval){
@@ -216,13 +247,14 @@ void dormmovl(char input,char * bitval){
     
     if(input == '0'){
         rmMovl(a,b,tmp);
-        fprintf(stdout,"rmmovl r%c,0x%s(r%c)\n",bitval[0],tmp,bitval[1]);
+        //fprintf(stdout,"rmmovl r%c,0x%s(r%c)\n",bitval[0],tmp,bitval[1]);
         free(tmp);
     }
-    else
-        fprintf(stderr,"ERROR <wonky5>\n");
+    else{
+        fprintf(stderr,"Status code : INS. Program exiting.\n");
+        exit(1);
+    }
 }
-
 void domrmovl(char input,char * bitval){
     char * tmp = calloc(1,strlen(bitval) + 1);
     bigToLittleEndian(tmp,bitval+2);
@@ -232,17 +264,18 @@ void domrmovl(char input,char * bitval){
 
     if(input == '0'){
         mrMovl(a,b,tmp);
-        fprintf(stdout,"mrmovl 0x%s(r%c),r%c\n",tmp, bitval[1],bitval[0]);
+        //fprintf(stdout,"mrmovl 0x%s(r%c),r%c\n",tmp, bitval[1],bitval[0]);
     }
-    else
-        fprintf(stderr,"ERROR <wonky6>\n");
+    else{
+        fprintf(stderr,"Status code : INS. Program exiting.\n");
+        exit(1);
+    }
 }
-
 void doAdd(int a, int b){
     
     char * rev = calloc(1,10);
     getStrFromReg(rev, a);
-    printf("%s\n",rev);
+    //printf("%s\n",rev);
     
     char * val1str = calloc(1,10);
     bigToLittleEndian(val1str,rev);
@@ -251,7 +284,7 @@ void doAdd(int a, int b){
     char * val2str = calloc(1,10);
     
     getStrFromReg(rev, b);
-    printf("%s\n",rev);
+    //printf("%s\n",rev);
     bigToLittleEndian(val2str,rev);
     
     int val2 = hexToDecimal(val2str);
@@ -276,7 +309,7 @@ void doAdd(int a, int b){
     else
         flags.ZF = 0;
     
-    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+    //fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
 
 
     char * tmp = calloc(1,9);
@@ -295,7 +328,7 @@ void doAdd(int a, int b){
 void doSubl(int a, int b){
     char * rev = calloc(1,10);
     getStrFromReg(rev, a);
-    printf("%s\n",rev);
+    //printf("%s\n",rev);
     
     char * val1str = calloc(1,10);
     bigToLittleEndian(val1str,rev);
@@ -304,7 +337,7 @@ void doSubl(int a, int b){
     char * val2str = calloc(1,10);
     
     getStrFromReg(rev, b);
-    printf("%s\n",rev);
+    //printf("%s\n",rev);
     bigToLittleEndian(val2str,rev);
     
     int val2 = hexToDecimal(val2str);
@@ -330,7 +363,7 @@ void doSubl(int a, int b){
     else
         flags.ZF = 0;
 
-    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+    //fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
 
 
     char * tmp = calloc(1,9);
@@ -350,9 +383,9 @@ void doAndl(int a, int b){
 
     int i = 0;
     for(i = 0; i < 4; i++){
-        printf("orig : %08x, %08x \n", registers[a][i].byte , registers[b][i].byte);
+        //printf("orig : %08x, %08x \n", registers[a][i].byte , registers[b][i].byte);
         registers[b][i].byte = registers[a][i].byte & registers[b][i].byte;
-        printf("val : %08x\n", registers[b][i].byte);
+        //printf("val : %08x\n", registers[b][i].byte);
     }
     
     char * res = calloc(1,10);
@@ -374,7 +407,7 @@ void doAndl(int a, int b){
     else
         flags.ZF = 0; 
     //printf("%s\n",res);
-    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+    //fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
 
     free(val1str);
     free(res);
@@ -407,7 +440,7 @@ void doXorl(int a, int b){
     else
         flags.ZF = 0; 
     //printf("%s\n",res);
-    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+    //fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
     
     free(val1str);
     free(res);
@@ -417,7 +450,7 @@ void doXorl(int a, int b){
 void doMull(int a, int b){
     char * rev = calloc(1,10);
     getStrFromReg(rev, a);
-    printf("%s\n",rev);
+    //printf("%s\n",rev);
     
     char * val1str = calloc(1,10);
     bigToLittleEndian(val1str,rev);
@@ -431,7 +464,7 @@ void doMull(int a, int b){
     
     int val2 = hexToDecimal(val2str);
     int tmpres = val1 * val2;
-    fprintf(stdout,"%d * %d = %d\n", val1, val2, tmpres);
+    //fprintf(stdout,"%d * %d = %d\n", val1, val2, tmpres);
     if(val1 > 0 && val2 > 0 && tmpres < 0){
         flags.OF = 1;
     }
@@ -454,7 +487,7 @@ void doMull(int a, int b){
     else
         flags.ZF = 0;
 
-    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+    //fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
 
     char * tmp = calloc(1,9);
 
@@ -497,7 +530,7 @@ void doCmpl(int a, int b){
         flags.SF = 0;
     }
 
-    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+    //fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
 
     free(val2str);
     free(val1str);
@@ -511,32 +544,32 @@ void doOper(char input, char * bitval){
 
     switch(input){
         case '0':
-            fprintf(stdout,"addl r%c,r%c\n", bitval[0], bitval[1]);
+            //fprintf(stdout,"addl r%c,r%c\n", bitval[0], bitval[1]);
             doAdd(a,b);
             break;
         case '1':
-            fprintf(stdout,"subl r%c,r%c\n", bitval[0], bitval[1]);
+            //fprintf(stdout,"subl r%c,r%c\n", bitval[0], bitval[1]);
             doSubl(a,b);
             break;
         case '2':
-            fprintf(stdout,"andl r%c,r%c\n", bitval[0], bitval[1]);
+            //fprintf(stdout,"andl r%c,r%c\n", bitval[0], bitval[1]);
             doAndl(a,b);
             break;
         case '3':
-            fprintf(stdout,"xorl r%c,r%c\n", bitval[0], bitval[1]);
+            //fprintf(stdout,"xorl r%c,r%c\n", bitval[0], bitval[1]);
             doXorl(a,b);
             break;
         case '4':
-            fprintf(stdout,"mull r%c,r%c\n", bitval[0], bitval[1]);
+            //fprintf(stdout,"mull r%c,r%c\n", bitval[0], bitval[1]);
             doMull(a,b);
             break;
         case '5':
-            fprintf(stdout,"cmpl r%c,r%c\n", bitval[0], bitval[1]);
+            //fprintf(stdout,"cmpl r%c,r%c\n", bitval[0], bitval[1]);
             doCmpl(a,b);
             break;  
         default:  
-            fprintf(stderr,"ERROR <wonky7>\n"); 
-            break;
+            fprintf(stderr,"Status code : INS. Program exiting.\n"); 
+            exit(1);
     }
 }
 
@@ -545,7 +578,7 @@ void doJump(char * dest){
 }
 
 void doJle(char * dest){
-    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+    //fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
 
 
     if((flags.SF ^ flags.OF) || flags.ZF){
@@ -556,7 +589,7 @@ void doJle(char * dest){
 }
 
 void doJl(char * dest){
-    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+    //fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
 
 
     if(flags.SF ^ flags.OF){
@@ -567,7 +600,7 @@ void doJl(char * dest){
 }
 
 void doJe(char * dest){
-    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+    //fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
 
 
     if(flags.ZF == 1){
@@ -578,7 +611,7 @@ void doJe(char * dest){
 }
 
 void doJne(char * dest){
-    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+    //fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
 
 
     if(flags.ZF != 1){
@@ -589,7 +622,7 @@ void doJne(char * dest){
 }
 
 void doJge(char * dest){
-    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+   //fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
 
     if(!(flags.SF ^ flags.OF)){
         IP = hexToDecimal(dest);
@@ -599,7 +632,7 @@ void doJge(char * dest){
 }
 
 void doJg(char * dest){
-    fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
+    //fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
 
 
     if(!(flags.SF^flags.OF) && !flags.ZF){
@@ -620,45 +653,45 @@ void doJmp(char input, char * bitval){
     tmp[strlen(dest)] = '\0';
     switch(input){
         case '0':
-            fprintf(stdout,"jmp 0x%s\n", tmp);
+            //fprintf(stdout,"jmp 0x%s\n", tmp);
             doJump(tmp);
             //IP = IP + 5;
             free(tmp);
             break;
         case '1':
-            fprintf(stdout,"jle 0x%s\n", tmp);
+            //fprintf(stdout,"jle 0x%s\n", tmp);
             doJle(tmp);
             free(tmp);
             break;
         case '2':
-            fprintf(stdout,"jl 0x%s\n", tmp);
+            //fprintf(stdout,"jl 0x%s\n", tmp);
             doJl(tmp);         
             free(tmp);
             break;
         case '3':
-            fprintf(stdout,"je 0x%s\n", tmp);
+            //fprintf(stdout,"je 0x%s\n", tmp);
             doJe(tmp);
             //IP = IP + 5;
             free(tmp);
             break;
         case '4':
-            fprintf(stdout,"jne 0x%s\n", tmp);
+            //fprintf(stdout,"jne 0x%s\n", tmp);
             doJne(tmp);
             free(tmp);
             break;
         case '5':
-            fprintf(stdout,"jge 0x%s\n", tmp);
+            //fprintf(stdout,"jge 0x%s\n", tmp);
             doJge(tmp);
             free(tmp);
             break;
         case '6':
-            fprintf(stdout,"jg 0x%s\n", tmp);
+            //fprintf(stdout,"jg 0x%s\n", tmp);
             doJg(tmp);
             free(tmp);
             break;
         default:
-            fprintf(stderr,"ERROR <wonky8>\n"); 
-            break;
+            fprintf(stderr,"Status Code : INS. Program exiting.\n");
+            exit(1); 
     }
     free(dest);
 }
@@ -682,11 +715,15 @@ void call(char * val){
 
     int i = 0;
     for(i = 0; i < 4; i++){
+        if((espa + i) > size || (espa + i) < 0){
+            fprintf(stderr, "Status code : ADR. Program exiting.\n");
+            exit(1);
+        }
         memory[espa + i] = toge[i];
     }
     
     //bigToLittleEndian(val2str,val);
-    fprintf(stdout,"%d\n",hexToDecimal(val));
+    //fprintf(stdout,"%d\n",hexToDecimal(val));
     IP = hexToDecimal(val);
 
     char * tmp2 = calloc(1,10);
@@ -713,10 +750,12 @@ void doCall(char input, char * bitval){
 
     if(input == '0'){
         call(tmp);
-        fprintf(stdout,"call 0x%s\n", tmp);
+        //fprintf(stdout,"call 0x%s\n", tmp);
     }
-    else
-        fprintf(stderr,"ERROR <wonky9>\n");
+    else{
+        fprintf(stderr,"Status code: INS. Program exiting.\n");
+        exit(1);
+    }
     free(tmp);
     free(dest);
 }
@@ -736,9 +775,11 @@ void ret(){
 
     int i = 0;
     for(i = 0; i < 4; i++){
-         returnval[i] = memory[espa + i];
-         //fprintf(stderr,"new : %02x\n origi : %02x\n",returnval[i],memory[espa + i]);
-
+        if((espa + i) > size || (espa + i) < 0){
+            fprintf(stderr,"Status code : ADR. Program exiting.\n");
+            exit(1);
+        }
+        returnval[i] = memory[espa + i];
     }
 
     returnval[4] = '\0';
@@ -759,10 +800,7 @@ void ret(){
     //fprintf(stderr,"val: %s\n",val2str);
     //fprintf(stderr,"oct : %01x\n oct 2:%08x\n",395,511);
     IP = hexToDecimal(val2str);
-    /*if(IP == 511){
-        IP = 395;
-    }*/
-    fprintf(stdout,"\n-%d-\n", IP);
+    //fprintf(stdout,"\n-%d-\n", IP);
 
     espa = espa + 4;
 
@@ -784,12 +822,13 @@ void ret(){
 void doRet(char input){
     if(input == '0'){
         ret();
-        fprintf(stdout,"ret\n");
+        //fprintf(stdout,"ret\n");
     }
-    else
-        fprintf(stderr,"ERROR <wonky10>\n"); 
+    else{
+        fprintf(stderr,"Status code : INS. Program exiting\n"); 
+        exit(1);
+    }
 }
-
 void pushl(int a){
     char * rev = calloc(1,10);
     
@@ -802,6 +841,10 @@ void pushl(int a){
     
     int i = 0;
     for(i = 0; i < 4; i++){
+        if((espa + i) > size || (espa + i) < 0){
+            fprintf(stderr,"Status code : ADR. Program exiting.\n");
+            exit(1);
+        }
         memory[espa + i] = registers[a][i].byte;
     }
 
@@ -819,10 +862,12 @@ void doPushl(char input, char * bitval){
     int a = bitval[0] - '0';
     if(input == '0'&& bitval[1] == 'f'){
         pushl(a);
-        fprintf(stdout,"pushl r%c\n",bitval[0]);
+        //fprintf(stdout,"pushl r%c\n",bitval[0]);
     }
-    else
-        fprintf(stderr,"ERROR <wonky11>\n");
+    else{
+        fprintf(stderr,"Status code : INS. Program exiting.\n");
+        exit(1);
+    }
 }
 
 void popl(int a){
@@ -836,7 +881,12 @@ void popl(int a){
    
     int i = 0;
     for(i = 0; i < 4; i++){
-         registers[a][i].byte = memory[espa + i];
+        if((espa + i) > size || (espa + i) < 0){
+            fprintf(stderr,"Status code : ADR. Program exiting.\n");
+            exit(1);
+        }
+
+        registers[a][i].byte = memory[espa + i];
     }
 
     espa = espa + 4;
@@ -856,13 +906,52 @@ void doPopl(char input, char * bitval){
     int a = bitval[0] - '0';
     if(input == '0'&& bitval[1] == 'f'){
         popl(a);
-        fprintf(stdout,"popl r%c\n",bitval[0]);
+        //fprintf(stdout,"popl r%c\n",bitval[0]);
     }
-    else
-        fprintf(stderr,"ERROR <wonky12>\n");
+    else{
+        fprintf(stderr,"Status code : INS. Program exiting.\n");
+        exit(1);
+    }
 }
 
+void readb(int a, char * input){
+    char * str = calloc(1,100);
+    //fprintf(stdout,"test");
+    scanf("%s", str);
+    unsigned int val = atoi(str);
+    unsigned char valy = val;
+    //fprintf(stderr,"%s", str);
+    if(str == 0 || val == 0){
+        flags.ZF = 1;
+    }
+    else
+        flags.ZF = 0;
+    
+    char * orig = calloc(1,10);
+    getStrFromReg(orig,a);
+    char * rev = calloc(1,10);
+    bigToLittleEndian(rev,orig);
+    //char * rev2 = malloc(10);
+    //bigToLittleEndian(rev2,input);
+    
+    int addr  = hexToDecimal(rev);
+    int displ = hexToDecimal(input);
+       //fprintf(stderr,"\n");
+    if((addr + displ) > size || (addr + displ) < 0){
+            fprintf(stderr,"Status code : ADR. Program exiting.\n");
+            exit(1);
+        }
+    
+    memory[addr + displ] = valy;
+   
+    free(rev);
+    free(orig);
+    free(str);
+}
+
+
 void readl(int a, char * input){
+
     char * str = calloc(1,100);
     //fprintf(stdout,"test");
     scanf("%s", str);
@@ -898,6 +987,11 @@ void readl(int a, char * input){
     int i = 0;
     for(i = 0; i < 4; i++){
         //fprintf(stderr,"-%02x-",hexToge[i]);
+        if((addr + displ + i) > size || (addr + displ + i) < 0){
+            fprintf(stderr,"Status code : ADR. Program exiting.\n");
+            exit(1);
+        }
+
         memory[addr + displ + i] = hexToge[i];
     }
     //fprintf(stderr,"\n");
@@ -917,18 +1011,20 @@ void doReadX(char input, char * bitval){
     int a = bitval[0] - '0';
 
     if(input == '0' && bitval[1] == 'f'){
-        //readl(a,tmp);
-        fprintf(stdout,"readb 0x%s(r%c)\n",tmp,bitval[0]);
+        readb(a,tmp);
+        //fprintf(stdout,"readb 0x%s(r%c)\n",tmp,bitval[0]);
         free(tmp);
     }
     else if(input == '1' && bitval[1] == 'f'){
         //fprintf(stdout,"test");
         readl(a,tmp);
-        fprintf(stdout,"readl 0x%s(r%c)\n",tmp,bitval[0]);
+        //fprintf(stdout,"readl 0x%s(r%c)\n",tmp,bitval[0]);
         free(tmp);
     }
-     else
-        fprintf(stderr,"ERROR <wonky13>\n");
+     else{
+        fprintf(stderr,"Status code : INS. Program exiting.\n");
+        exit(1);
+     }
 }
 
 void writeb(int a, char * val){
@@ -939,8 +1035,13 @@ void writeb(int a, char * val){
 
     int addr = hexToDecimal(rev);
     int displ = hexToDecimal(val);
+    
+    if((addr + displ) > size || (addr + displ) < 0){
+            fprintf(stderr,"Status code : ADR. Program exiting.\n");
+            exit(1);
+        }
 
-    fprintf(stderr,"%c",memory[addr + displ]);
+    fprintf(stdout,"%c",memory[addr + displ]);
     free(rev);
     free(orig);
 }
@@ -957,6 +1058,11 @@ void writel(int a, char * val){
     int i =0;
     char * tmpa = calloc(1,5);
     for(i = 0; i < 4; i++){
+        if((addr + displ + i) > size || (addr + displ + i) < 0){
+            fprintf(stderr,"Status code : ADR. Program exiting.\n");
+            exit(1);
+        }
+
         sprintf(tmpa,"%02x", memory[addr+displ + i]);
         rev[2 * i] = tmpa[0];
         rev[(2 * i) + 1] = tmpa[1];
@@ -964,7 +1070,7 @@ void writel(int a, char * val){
     
     bigToLittleEndian(orig,rev);
     int res = hexToDecimal(orig);
-    fprintf(stderr,"%d",res);
+    fprintf(stdout,"%d",res);
     free(tmpa);
     free(rev);
     free(orig);
@@ -978,17 +1084,19 @@ void doWriteX(char input, char * bitval){
     int a = bitval[0] - '0';
     
     if(input == '0' && bitval[1] == 'f'){
-        writeb(a,bitval+2);
-        fprintf(stdout,"writeb 0x%s(r%c)\n",tmp,bitval[0]);
+        writeb(a,tmp);
+        //fprintf(stdout,"writeb 0x%s(r%c)\n",tmp,bitval[0]);
         free(tmp);
     }
     else if(input == '1' && bitval[1] == 'f'){
-        writel(a,bitval+2);
-        fprintf(stdout,"writel 0x%s(r%c)\n",tmp,bitval[0]);
+        writel(a,tmp);
+        //fprintf(stdout,"writel 0x%s(r%c)\n",tmp,bitval[0]);
         free(tmp);
     }
-    else
-        fprintf(stderr,"ERROR <wonky14>\n");
+    else{
+        fprintf(stderr,"Status Code : INS. Program exiting.\n");
+        exit(1);
+    }
 }
 
 void doMovsbl(char input, char * bitval){
@@ -999,29 +1107,28 @@ void doMovsbl(char input, char * bitval){
     int b = bitval[1] - '0';
     if(input == '0'){
         movSBL(a,b,tmp);
-        fprintf(stdout,"movsbl 0x%s(r%c),r%c\n",tmp,bitval[1], bitval[0]);
+        //fprintf(stdout,"movsbl 0x%s(r%c),r%c\n",tmp,bitval[1], bitval[0]);
         free(tmp);
     }
-    else
-        fprintf(stderr,"ERROR <wonky15>\n");
+    else{
+        fprintf(stderr,"Status code : INS. Program exiting.\n");
+        exit(1);
+    }
 }
 
 int main(int argc, char ** argv){
     
-    
-    /*int x = hexToDecimal("fffffffc");
-    fprintf(stderr,"%d\n",x);*/
-    
-    //int po;
-    //sscanf("fffffffc","%x",&po);
-    //printf("%d",po);
+    signal(SIGINT, intHandler);
+    while(keepRunning){
 
-
-    /*for(int l = 0;l < 8; l++){
-        for(int j = 0; j < 4; j++){
-            registers[l][j].byte = 243;
-        }
-    }*/
+    if(argc != 2){
+        fprintf(stderr,"ERROR: <Incorrect number of arguments,use -h for help>\n");
+        return 0;
+    } 
+    else if(!strcmp(argv[1],"-h")){
+        fprintf(stderr,"Usage: ./y86emul <File name>\n");
+        return 0;
+    }
     FILE* fp;
     int bufferSize = 10000;
     char * buff = calloc(1,10000+1);
@@ -1031,12 +1138,12 @@ int main(int argc, char ** argv){
     if(fp == NULL){
         fprintf(stderr,"ERROR: <File not found>\n");
         free(buff);
-        fclose(fp);
+        free(memory);
+        //fclose(fp);
         return 0;
     }
 
     int sizeFound = 0;
-    int size;
     int opSize;
     int i = 5;
     while(fgets(buff,bufferSize, (FILE*)fp) != NULL){
@@ -1066,7 +1173,7 @@ int main(int argc, char ** argv){
                 memory[l] = 0;
             }
 
-            fprintf(stdout,"Memory created, intialized to 0\n");
+            //fprintf(stdout,"Memory created, intialized to 0\n");
 
             free(tmp);
             sizeFound = 1;
@@ -1121,7 +1228,7 @@ int main(int argc, char ** argv){
             free(tmp3);
             free(tmp2);
 
-            fprintf(stdout,"Long Address 0x%08x (dec index): %d, Value : %d%d%d%d , %02x%02x%02x%02x\n", address, address, memory[address], memory[address+1], memory[address+2], memory[address+3], memory[address], memory[address+1], memory[address+2], memory[address+3]);
+            //fprintf(stdout,"Long Address 0x%08x (dec index): %d, Value : %d%d%d%d , %02x%02x%02x%02x\n", address, address, memory[address], memory[address+1], memory[address+2], memory[address+3], memory[address], memory[address+1], memory[address+2], memory[address+3]);
             free(tmp);
         }
 
@@ -1152,7 +1259,7 @@ int main(int argc, char ** argv){
             //printf("Long Address 0x%s (dec index): %d , Value : %s\n",tmp,address,tmp2);
             memory[address] = hexToDecimal(tmp2);
 
-            fprintf(stdout,"Byte address 0x%08x (dec index): %d, Value : %d , %02x\n",address, address, memory[address], memory[address]);
+            //fprintf(stdout,"Byte address 0x%08x (dec index): %d, Value : %d , %02x\n",address, address, memory[address], memory[address]);
             free(tmp2);
             free(tmp);
         }
@@ -1204,17 +1311,19 @@ int main(int argc, char ** argv){
             }
             free(tmp3);
 
-            fprintf(stdout,"\nText code 0x%08x (dec index): %d,-> Value : ", address, address);
+            //fprintf(stdout,"\nText code 0x%08x (dec index): %d,-> Value : ", address, address);
              
             /*for(k = address; k < address + (opSize/2); k++){
                 printf("%d",memory[k]);
             }*/
+            /*
             printf("\n");
             //printf("-%02x-\n",memory[address]);
             for(k = address; k < address + (opSize/2); ++k){
                 printf("%02x",memory[k]);
             }
             printf("\n\n");
+            */
             //printf("\n-%02x-\n",memory[address]);
             IP = address;
             //printf("\n-%c-\n",memory[address]);
@@ -1266,13 +1375,13 @@ int main(int argc, char ** argv){
             }
 
 
-            fprintf(stdout,"\nString 0x%08x (dec index): %d,-> Value : ", address, address);
-
+            //fprintf(stdout,"\nString 0x%08x (dec index): %d,-> Value : ", address, address);
+/*
             for(i = address; i < address + strsize; i++){
-                fprintf(stdout, "%c", memory[i]);
+                //fprintf(stdout, "%c", memory[i]);
             }
-            fprintf(stdout, "\n");
-             
+            //fprintf(stdout, "\n");
+*/             
             free(tmp2);
             free(tmp);
 
@@ -1288,6 +1397,12 @@ int main(int argc, char ** argv){
     int insSize = (opSize/2) + IP;
 
     do{
+        AOK = 1;
+        if((IP) > size || (IP) < 0){
+            fprintf(stderr,"Status code : ADR. Program exiting.\n");
+            exit(1);
+        }
+
         line++;
         char * tmp9 = calloc(1,3);
         sprintf(tmp9,"%02x",memory[IP]);
@@ -1296,7 +1411,8 @@ int main(int argc, char ** argv){
         if(isspace(opcode)){
             return 0;
         }
-        printf("%d: ", line);
+        //printf("%d: ", line);
+        
         char fncode = tmp9[1];
         //printf("*%c*\n",tmp9[1]);
 
@@ -1408,38 +1524,20 @@ int main(int argc, char ** argv){
                 IP = IP+6;
                 break;
             default:
-                fprintf(stdout,"ERROR: <Unrecognized opcode %c>\n", opcode);
-                return 0;
+                fprintf(stderr,"Status code : INS. Program exiting.\n");
+                exit(1);
                 //doNoOp(fncode
         }
     free(bit);
-    fprintf(stdout, "\nIP : %d , insSize : %d\n",IP,insSize);
-    //char * tmpad = malloc(10);
-    //getStrFromReg(tmpad,7);
-    //fprintf(stdout, "\nreg7 : %s \n", tmpad);
-    //free(tmp9);
-    //free(bit);
     }
+    
     while(notHalted);
-    /*
-    printf("\n");
-    storeInReg(6,"12345678");
-    storeInReg(7,"00000000");
-    storeInReg(4,"40100000");
-    rmMovl(6,7,"00000000");
-
-    for(int f = 0; f < 4; f++){
-        fprintf(stdout,"%02x", memory[f]);
+    if(!notHalted){
+        fprintf(stdout,"Status Code : HLT. Program exiting.\n");
     }
-    //call("05000000");
 
-    char * testingstr = calloc(1,10);
-    getStrFromReg(testingstr,7);
-    //fprintf(stdout,"\n%s\n", testingstr);
-
-    //fprintf(stdout, "OF:%d SF:%d ZF:%d\n",flags.OF,flags.SF,flags.ZF);
-    */
     free(memory);
+    keepRunning = 0;
+    }
     return 0;
-
 }
