@@ -170,7 +170,9 @@ void movSBL(int a, int b, char * val){
         fprintf(stderr, "Status code: ADR. Program exiting.\n");
         exit(1);
     }
+    //fprintf(stdout,"loc = %d\n",addr);
     char bit = memory[addr+displ];
+    //fprintf(stdout,"%02x\n",bit);
     char * tmp = calloc(1,4);
     sprintf(tmp, "%02x",bit);
     tmp[2] = '\0';
@@ -514,7 +516,7 @@ void doCmpl(int a, int b){
     bigToLittleEndian(val2str,rev);
     int val2 = hexToDecimal(val2str);
     int tmpres = val1 - val2;
-
+    //fprintf(stdout, "%08x - %08x = %08x\n", val1, val2, tmpres);
     flags.OF = 0;
     if(tmpres == 0){
         flags.ZF = 1;
@@ -920,8 +922,9 @@ void readb(int a, char * input){
     scanf("%s", str);
     unsigned int val = atoi(str);
     unsigned char valy = val;
+    
     //fprintf(stderr,"%s", str);
-    if(str == 0 || val == 0){
+    if(str == 0 ){
         flags.ZF = 1;
     }
     else
@@ -957,7 +960,7 @@ void readl(int a, char * input){
     scanf("%s", str);
     int val = atoi(str);
     //fprintf(stderr,"%s", str);
-    if(str == 0 || val == 0){
+    if(str == 0){
         flags.ZF = 1;
     }
     else
