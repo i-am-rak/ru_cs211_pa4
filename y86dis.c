@@ -321,7 +321,7 @@ void doMovsbl(char input, char * bitval){
     char * reg1 = malloc(8);
     regValToStr(reg1,bitval[0]);
     char * reg2 = malloc(8);
-    regValToStr(reg2,bitval[0]);
+    regValToStr(reg2,bitval[1]);
 
     if(input == '0'){
         if(hexToDecimal(tmp) == 0){
