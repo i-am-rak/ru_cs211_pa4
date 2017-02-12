@@ -5,6 +5,8 @@ The y86 emulator first parses the argument (“prog1.y86”) and populates the m
 values. This includes first to malloc the size, and then store the .text, .byte, .long and other parts of the
 file. If the input is –h, it prints out a message to explain how to use the program. There are also error
 checking to see if the file exists and it is of correct format.
+
+
 After the file is parsed and memory is populated, the fetch, decode and execute cycle starts. This is done
 with a do while loop which starts at the position specified at text and checks the opcodes of the
 instructions. This opcode is fed to a switch statement which calls the respective functions (for example
@@ -15,6 +17,8 @@ until the halt opcode is found, which exits the while loop. After the while loop
 be freed and the program will exit. If the program ends on HLT, it will also print out the respective
 message to state that it halted. Other ways the program can exit is through one of the other status
 codes.
+
+
 For the status codes, if there is an incorrect instruction or address, the program prints out the respective
 message and then exits the program (exit(1);). The program always sets the AOK flag until another flag is
 set (HLT, INS, or ADR) and will only print out AOK if the program ends prematurely. This can be done
